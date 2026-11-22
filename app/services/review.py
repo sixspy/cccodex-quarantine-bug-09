@@ -9,7 +9,8 @@ def list_tickets(db_path: str | None = None) -> list[dict]:
     with get_db(db_path) as conn:
         rows = conn.execute(
             """
-            SELECT t.*, r.status AS row_status, r.reason, i.item_key, b.bin_code
+            SELECT t.*, r.status AS row_status, r.reason, i.item_key, i.quality,
+                   b.bin_code, i.mapping_no, i.mapping_key, i.column_fingerprint
             FROM review_tickets t
             JOIN quarantine_rows r ON r.id=t.row_id
             JOIN capture_items i ON i.id=r.item_id

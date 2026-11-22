@@ -1,11 +1,10 @@
 import { api } from '../api.js';
 
 export async function renderBins(el) {
-  const bins = await api('/api/bins');
-  const rows = await api('/api/rows');
+  const [bins, rows] = await Promise.all([api('/api/bins'), api('/api/rows')]);
   el.innerHTML = `
     <div class="card">
-      <h2>隔离舱</h2> <span class="chip" data-thick="map_cutover">切版已亮</span>
+      <h2>隔离舱</h2>
       <table>
         <thead><tr><th>舱号</th><th>标题</th><th>状态</th><th>占用/容量</th><th>待复核</th></tr></thead>
         <tbody>
@@ -21,9 +20,9 @@ export async function renderBins(el) {
       </table>
     </div>
     <div class="card">
-      <h2>舱内行</h2>
+      <h2>舱内行 · 切版留痕</h2>
       <table>
-        <thead><tr><th>舱</th><th>条目键</th><th>质量</th><th>原因</th><th>状态</th></tr></thead>
+        <thead><tr><th>舱</th><th>条目键</th><th>质量</th><th>原因</th><th>状态</th><th>映射号</th><th>列指纹</th></tr></thead>
         <tbody>
           ${(rows.items || []).map((r) => `
             <tr>
@@ -32,6 +31,8 @@ export async function renderBins(el) {
               <td>${r.quality}</td>
               <td>${r.reason}</td>
               <td><span class="chip">${r.status}</span></td>
+              <td><span class="chip">${r.mapping_no || '—'}</span></td>
+              <td><code>${r.column_fingerprint || '—'}</code></td>
             </tr>`).join('')}
         </tbody>
       </table>

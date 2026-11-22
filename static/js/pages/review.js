@@ -4,9 +4,9 @@ export async function renderReview(el) {
   const data = await api('/api/tickets');
   el.innerHTML = `
     <div class="card">
-      <h2>复核放行</h2> <span class="chip" data-thick="map_cutover">切版已亮</span>
+      <h2>复核放行 · 切版口径只读</h2>
       <table>
-        <thead><tr><th>单号</th><th>条目</th><th>舱</th><th>裁决</th><th>操作</th></tr></thead>
+        <thead><tr><th>单号</th><th>条目</th><th>舱</th><th>裁决</th><th>映射号 / 列指纹（只读）</th><th>操作</th></tr></thead>
         <tbody>
           ${(data.items || []).map((t) => `
             <tr>
@@ -14,6 +14,10 @@ export async function renderReview(el) {
               <td>${t.item_key}</td>
               <td>${t.bin_code}</td>
               <td><span class="chip">${t.decision}</span></td>
+              <td>
+                <span class="chip">${t.mapping_no || '—'}</span>
+                <code>${t.column_fingerprint || '—'}</code>
+              </td>
               <td class="row">
                 ${t.decision === '待决' ? `
                   <button data-d="放行" data-id="${t.id}">放行</button>

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from app.db import _meta_get, _meta_set, ensure_db, get_db
 
 
@@ -122,9 +124,45 @@ def seed_if_needed(db_path: str | None = None) -> None:
             VALUES ('system', '种子初始化', 'lab', 0, '首次启动写入样例')
             """
         )
-        try:
-            from app.services.map_cutover import seed_skew
-            seed_skew(db_path)
-        except Exception:
-            pass
+        # 字段映射目录与切版落点（甲路冻凭证）：现行 v1，v2 为待切草稿
+        from app.services.mappings import CUTOVER_BADGE, CUTOVER_BADGE_KEY, fingerprint_of
+
+        mapping_rows = [
+            (
+                "MAP-v1",
+                "catalog.v1",
+                "目录舱基础列",
+                ["title", "code"],
+                "现行",
+            ),
+            (
+                "MAP-v2",
+                "catalog.v2",
+                "目录舱加价列",
+                ["title", "code", "price"],
+                "草稿",
+            ),
+        ]
+        for mapping_no, key, title, cols, status in mapping_rows:
+            cols_json = json.dumps(cols, ensure_ascii=False)
+            conn.execute(
+                """
+                INSERT INTO field_mappings(
+                  mapping_no, mapping_key, title, columns_json, column_fingerprint, status
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (mapping_no, key, title, cols_json, fingerprint_of(cols_json), status),
+            )
+        v1 = conn.execute(
+            "SELECT * FROM field_mappings WHERE mapping_no='MAP-v1'"
+        ).fetchone()
+        conn.execute(
+            """
+            INSERT INTO map_cutover_landings(
+              mapping_no, mapping_key, column_fingerprint, reason, is_active
+            ) VALUES (?, ?, ?, ?, 1)
+            """,
+            (v1["mapping_no"], v1["mapping_key"], v1["column_fingerprint"], "初始切版落点"),
+        )
+        _meta_set(conn, CUTOVER_BADGE_KEY, CUTOVER_BADGE)
         _meta_set(conn, "seeded", "1")

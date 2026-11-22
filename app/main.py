@@ -18,9 +18,7 @@ from app.services import reconcile as reconcile_svc
 from app.services import review as review_svc
 from app.services import rework as rework_svc
 from app.services import settings as settings_svc
-from app.services import map_cutover as map_cutover_svc
-from app.services import map_cutover_cutover as map_cutover_cutover_svc
-from app.services import map_cutover_dualwrite as map_cutover_dual_svc
+from app.services import mappings as mappings_svc
 from app.services import sources as sources_svc
 from app.services.errors import ServiceError
 
@@ -309,37 +307,29 @@ def create_app():
             return _json(policies_svc.apply_to_batch(int(body.get("batch_id") or 0)))
 
 
-        def map_cutover_dash(request):
+        def mappings_list(request):
             _require(request)
-            return _json(map_cutover_cutover_svc.board())
+            return _json(
+                {
+                    "items": mappings_svc.list_mappings(),
+                    "gate": mappings_svc.gate_summary(),
+                    "landings": mappings_svc.list_landings(),
+                }
+            )
 
-        def map_cutover_commit(request):
+        def mapping_gate(request):
             _require(request)
-            body = _read_json(request)
-            return _json(map_cutover_svc.commit_action(body))
+            return _json(mappings_svc.gate_summary())
 
-        def map_cutover_half(request):
-            _require(request)
-            return _json(map_cutover_svc.reconcile_display())
-
-        def map_cutover_snap(request):
-            _require(request)
-            return _json(map_cutover_svc.snapshot())
-
-        def map_cutover_cutover(request):
+        def mapping_cutover(request):
             _require(request)
             body = _read_json(request)
             return _json(
-                map_cutover_cutover_svc.append_cutover(
-                    int(body.get("ref_id") or 0),
-                    str(body.get("note") or "映射切版"),
+                mappings_svc.cutover(
+                    str(body.get("mapping_no") or ""),
+                    str(body.get("reason") or ""),
                 )
             )
-
-        def map_cutover_dual(request):
-            _require(request)
-            body = _read_json(request)
-            return _json(map_cutover_dual_svc.apply_dualwrite(str(body.get("note") or "映射切版")))
 
         def audits_list(request):
             _require(request)
@@ -379,12 +369,9 @@ def create_app():
         config.add_route("rule_enable", "/api/rules/{id}/enable")
         config.add_route("rule_apply", "/api/rules/apply")
         config.add_route("audits", "/api/audits")
-        config.add_route("map_cutover_dash", "/api/map_cutover/dash")
-        config.add_route("map_cutover_commit", "/api/map_cutover/commit")
-        config.add_route("map_cutover_half", "/api/map_cutover/half")
-        config.add_route("map_cutover_snap", "/api/map_cutover/snap")
-        config.add_route("map_cutover_cutover", "/api/map_cutover/cutover")
-        config.add_route("map_cutover_dual", "/api/map_cutover/dual")
+        config.add_route("mappings", "/api/mappings")
+        config.add_route("mapping_gate", "/api/mappings/gate")
+        config.add_route("mapping_cutover", "/api/mappings/cutover")
 
 
         config.add_view(root, route_name="root")
@@ -423,12 +410,9 @@ def create_app():
         config.add_view(wrap(rule_enable), route_name="rule_enable", request_method="POST")
         config.add_view(wrap(rule_apply), route_name="rule_apply", request_method="POST")
         config.add_view(wrap(audits_list), route_name="audits", request_method="GET")
-        config.add_view(wrap(map_cutover_dash), route_name="map_cutover_dash", request_method="GET")
-        config.add_view(wrap(map_cutover_commit), route_name="map_cutover_commit", request_method="POST")
-        config.add_view(wrap(map_cutover_half), route_name="map_cutover_half", request_method="POST")
-        config.add_view(wrap(map_cutover_snap), route_name="map_cutover_snap", request_method="GET")
-        config.add_view(wrap(map_cutover_cutover), route_name="map_cutover_cutover", request_method="POST")
-        config.add_view(wrap(map_cutover_dual), route_name="map_cutover_dual", request_method="POST")
+        config.add_view(wrap(mappings_list), route_name="mappings", request_method="GET")
+        config.add_view(wrap(mapping_gate), route_name="mapping_gate", request_method="GET")
+        config.add_view(wrap(mapping_cutover), route_name="mapping_cutover", request_method="POST")
 
 
         return config.make_wsgi_app()

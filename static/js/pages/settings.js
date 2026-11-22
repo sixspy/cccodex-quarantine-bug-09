@@ -1,7 +1,10 @@
 import { api } from '../api.js';
 
 export async function renderSettings(el) {
-  const data = await api('/api/settings');
+  const [data, gate] = await Promise.all([
+    api('/api/settings'),
+    api('/api/mappings/gate'),
+  ]);
   el.innerHTML = `
     <div class="card">
       <h2>台参数</h2>
@@ -17,6 +20,20 @@ export async function renderSettings(el) {
             </tr>`).join('')}
         </tbody>
       </table>
+    </div>
+    <div class="card">
+      <h3>切版口径（只读）</h3>
+      <p class="muted">切版操作统一在「映射页」进行，本页仅展示现行凭证，不在此改绑。</p>
+      <div class="stat-strip">
+        <div class="stat"><span class="muted">切版徽标</span><b>${gate.badge || '未亮'}</b></div>
+        <div class="stat"><span class="muted">现行映射号</span><b>${gate.mapping_no || '无'}</b></div>
+        <div class="stat"><span class="muted">映射键</span><b>${gate.mapping_key || '—'}</b></div>
+        <div class="stat"><span class="muted">现行落点</span><b>#${gate.landing_id || '—'}</b></div>
+      </div>
+      <p class="${gate.aligned ? 'hint-box' : 'hint-box err'}">
+        列指纹 <code>${gate.column_fingerprint || '空'}</code>
+        ${gate.aligned ? '· 口径对齐，采集放行' : `· ${gate.reason || '口径未对齐，拒采集'}`}
+      </p>
     </div>`;
   el.querySelectorAll('[data-save]').forEach((btn) => {
     btn.onclick = async () => {
@@ -28,40 +45,4 @@ export async function renderSettings(el) {
       await renderSettings(el);
     };
   });
-
-  try {
-    const dash = await api('/api/map_cutover/dash');
-    el.innerHTML += `<div class="card" style="margin-top:1rem">
-      <h3>映射切版</h3>
-      <span class="chip">${dash.chip}</span>
-      <p class="muted">读轨 ${dash.active_read} · 切流指纹 ${dash.cutover_fp || '空'} · 拒回刷 ${dash.reject_refresh} · 归档 ${dash.archive_count} · 新旗 ${dash.live_flag || '空'} · 对齐差 ${dash.panel_pack_mismatch}</p>
-      <div class="row">
-        <button id="go_map_cutover" type="button">落台</button>
-        <button id="half_map_cutover" type="button">半修对齐</button>
-        <button id="cut_map_cutover" type="button">切流账册</button>
-        <button id="dual_map_cutover" type="button">双写两轨</button>
-      </div>
-    </div>`;
-    const go = el.querySelector('#go_map_cutover');
-    if (go) go.onclick = async () => {
-      await api('/api/map_cutover/commit', { method:'POST', body: JSON.stringify({ref:1}) });
-      await renderSettings(el);
-    };
-    const half = el.querySelector('#half_map_cutover');
-    if (half) half.onclick = async () => {
-      await api('/api/map_cutover/half', { method:'POST', body:'{}' });
-      await renderSettings(el);
-    };
-    const cut = el.querySelector('#cut_map_cutover');
-    if (cut) cut.onclick = async () => {
-      await api('/api/map_cutover/cutover', { method:'POST', body: JSON.stringify({ref_id:1, note:'映射切版'}) });
-      await renderSettings(el);
-    };
-    const dual = el.querySelector('#dual_map_cutover');
-    if (dual) dual.onclick = async () => {
-      await api('/api/map_cutover/dual', { method:'POST', body: JSON.stringify({note:'映射切版'}) });
-      await renderSettings(el);
-    };
-  } catch (e) { /* optional surface */ }
-
 }

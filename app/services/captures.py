@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from app.db import get_db
 from app.services import audit as audit_svc
+from app.services import mappings as mappings_svc
 from app.services.errors import ServiceError
 
 
 def list_batches(db_path: str | None = None) -> list[dict]:
+    gate = mappings_svc.get_gate(db_path)
     with get_db(db_path) as conn:
         rows = conn.execute(
             """
@@ -13,7 +15,10 @@ def list_batches(db_path: str | None = None) -> list[dict]:
             FROM capture_batches ORDER BY id DESC
             """
         ).fetchall()
-        return [dict(r) for r in rows]
+        out = [dict(r) for r in rows]
+        for row in out:
+            row["current_mapping_no"] = gate["mapping_no"]
+        return out
 
 
 def get_batch(batch_id: int, db_path: str | None = None) -> dict:
@@ -25,7 +30,8 @@ def get_batch(batch_id: int, db_path: str | None = None) -> dict:
             raise ServiceError("批次不存在", 404)
         items = conn.execute(
             """
-            SELECT id, item_key, quality, status, payload, created_at
+            SELECT id, item_key, quality, status, payload,
+                   mapping_no, mapping_key, column_fingerprint, created_at
             FROM capture_items WHERE batch_id=? ORDER BY id
             """,
             (batch_id,),
@@ -80,15 +86,26 @@ def add_item(
         ).fetchone()
         if exists:
             raise ServiceError("同批键已存在")
+        # 采集闸：无切版落点 / 徽标与映射号拧花 / 列指纹不合，一律拒写，不沿旧映射
+        gate = mappings_svc.verify_payload(payload, db_path)
         cur = conn.execute(
             """
-            INSERT INTO capture_items(batch_id, item_key, payload, quality, status)
-            VALUES (?, ?, ?, ?, '待检')
+            INSERT INTO capture_items(
+              batch_id, item_key, payload, quality, status,
+              mapping_no, mapping_key, column_fingerprint
+            )
+            VALUES (?, ?, ?, ?, '待检', ?, ?, ?)
             """,
-            (batch_id, item_key, payload or "", quality),
+            (
+                batch_id,
+                item_key,
+                payload or "",
+                quality,
+                gate["mapping_no"],
+                gate["mapping_key"],
+                gate["column_fingerprint"],
+            ),
         )
-        from app.services.map_cutover import commit_action
-        commit_action({"batch_id": batch_id, "item_key": item_key}, db_path)
         _refresh_batch_counts(conn, batch_id)
         item_id = cur.lastrowid
         if quality == "合格" and not (payload or "").strip():
@@ -98,8 +115,6 @@ def add_item(
         row = conn.execute("SELECT * FROM capture_items WHERE id=?", (item_id,)).fetchone()
     audit_svc.write_event("追加条目", "capture_item", item_id, item_key, db_path=db_path)
     out = dict(row)
-    out["chip"] = "回填已亮"
-    out["active_read"] = "old_track"
     return out
 
 

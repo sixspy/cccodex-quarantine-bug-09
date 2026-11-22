@@ -24,7 +24,8 @@ def list_rows(bin_id: int | None = None, db_path: str | None = None) -> list[dic
         if bin_id:
             rows = conn.execute(
                 """
-                SELECT r.*, i.item_key, i.quality, i.batch_id, b.bin_code, b.title AS bin_title
+                SELECT r.*, i.item_key, i.quality, i.batch_id, b.bin_code, b.title AS bin_title,
+                       i.mapping_no, i.column_fingerprint
                 FROM quarantine_rows r
                 JOIN capture_items i ON i.id=r.item_id
                 JOIN quarantine_bins b ON b.id=r.bin_id
@@ -36,7 +37,8 @@ def list_rows(bin_id: int | None = None, db_path: str | None = None) -> list[dic
         else:
             rows = conn.execute(
                 """
-                SELECT r.*, i.item_key, i.quality, i.batch_id, b.bin_code, b.title AS bin_title
+                SELECT r.*, i.item_key, i.quality, i.batch_id, b.bin_code, b.title AS bin_title,
+                       i.mapping_no, i.column_fingerprint
                 FROM quarantine_rows r
                 JOIN capture_items i ON i.id=r.item_id
                 JOIN quarantine_bins b ON b.id=r.bin_id

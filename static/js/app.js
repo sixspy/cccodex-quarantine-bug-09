@@ -6,6 +6,7 @@ import { renderRework } from './pages/rework.js';
 import { renderReconcile } from './pages/reconcile.js';
 import { renderSources } from './pages/sources.js';
 import { renderPolicies } from './pages/policies.js';
+import { renderMappings } from './pages/mappings.js';
 import { renderAudit } from './pages/audit.js';
 import { renderSettings } from './pages/settings.js';
 
@@ -18,6 +19,7 @@ const pages = {
   reconcile: renderReconcile,
   sources: renderSources,
   policies: renderPolicies,
+  mappings: renderMappings,
   audit: renderAudit,
   settings: renderSettings,
 };
@@ -25,8 +27,11 @@ const pages = {
 async function refreshDash() {
   try {
     const d = await api('/api/dashboard');
+    const gate = d.map_cutover_gate || {};
     document.getElementById('dashHint').textContent =
-      ` · 批次${d.batches} · 源站${d.sites} · 待复核${d.pending_rows} · 回炉${d.rework_queue} · 审计${d.audits}`;
+      ` · 批次${d.batches} · 源站${d.sites} · 待复核${d.pending_rows} · 回炉${d.rework_queue} · 审计${d.audits}` +
+      ` · 现行映射 ${gate.mapping_no || '无'}` +
+      (gate.aligned ? '' : ' · 切版口径未对齐(拒采集)');
   } catch (e) {
     if (String(e.message).includes('未登录')) location.href = '/login';
   }

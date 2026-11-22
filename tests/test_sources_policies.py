@@ -8,8 +8,8 @@ def test_source_and_policy_chain(db_path):
     sources.set_status(site["id"], "观察", db_path)
     sources.update_quota(site["id"], 70, db_path)
     batch = captures.create_batch("站内目录戊", "策略批", db_path)
-    captures.add_item(batch["id"], "sku-e1", "{}", "缺字段", db_path)
-    captures.add_item(batch["id"], "sku-e2", "", "编码空", db_path)
+    captures.add_item(batch["id"], "sku-e1", '{"title":"缺码件","code":""}', "缺字段", db_path)
+    captures.add_item(batch["id"], "sku-e2", '{"title":"","code":"E-2"}', "编码空", db_path)
     result = policies.apply_to_batch(batch["id"], db_path)
     assert result["entered"] >= 2
     events = audit.list_events(50, db_path)

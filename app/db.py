@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS capture_items (
   payload TEXT NOT NULL DEFAULT '',
   quality TEXT NOT NULL CHECK (quality IN ('合格','缺字段','编码空','重复键')),
   status TEXT NOT NULL CHECK (status IN ('待检','入舱','已放行','回炉中','已关闭')),
+  mapping_no TEXT NOT NULL DEFAULT '',
+  mapping_key TEXT NOT NULL DEFAULT '',
+  column_fingerprint TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(batch_id, item_key)
 );
@@ -127,7 +130,39 @@ CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS field_mappings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mapping_no TEXT NOT NULL UNIQUE,
+  mapping_key TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  columns_json TEXT NOT NULL,
+  column_fingerprint TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('草稿','现行','归档')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS map_cutover_landings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mapping_no TEXT NOT NULL,
+  mapping_key TEXT NOT NULL,
+  column_fingerprint TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  is_active INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_landing_active_one
+  ON map_cutover_landings(is_active) WHERE is_active=1;
 """
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """给旧库补 capture_items 切版留痕列。"""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(capture_items)").fetchall()}
+    for col in ("mapping_no", "mapping_key", "column_fingerprint"):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE capture_items ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
 
 
 def ensure_db() -> Path:
@@ -136,6 +171,7 @@ def ensure_db() -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path) as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
         conn.commit()
     return path
 
@@ -144,9 +180,10 @@ def ensure_db() -> Path:
 def get_db(db_path: str | Path | None = None):
     path = Path(db_path) if db_path else Config.DATABASE_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=5)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=5000")
     try:
         yield conn
         conn.commit()

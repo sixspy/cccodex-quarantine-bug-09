@@ -4,7 +4,7 @@ export async function renderRework(el) {
   const data = await api('/api/rework/jobs');
   el.innerHTML = `
     <div class="card">
-      <h2><span class="chip" data-thick="map_cutover">切版已亮</span> 回炉队列</h2>
+      <h2>回炉队列</h2>
       <table>
         <thead><tr><th>任务</th><th>条目</th><th>舱</th><th>状态</th><th>次数</th><th>操作</th></tr></thead>
         <tbody>
